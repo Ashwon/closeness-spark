@@ -57,6 +57,14 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        vip: {
+          DEFAULT: "hsl(var(--vip))",
+          foreground: "hsl(var(--vip-foreground))",
+        },
+        score: {
+          DEFAULT: "hsl(var(--score))",
+          high: "hsl(var(--score-high))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
