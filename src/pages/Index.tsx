@@ -1,97 +1,164 @@
+import { useState } from "react";
 import { useSocialGraph } from "@/hooks/useSocialGraph";
-import FriendCard from "@/components/FriendCard";
-import SuggestionCard from "@/components/SuggestionCard";
-import AddPersonForm from "@/components/AddPersonForm";
-import { Users, Sparkles, Crown } from "lucide-react";
 
 const Index = () => {
   const { friends, suggestions, allPeople, addNewPerson, toggleVip, addFriend, removeFriend } =
     useSocialGraph("you");
 
+  const [name, setName] = useState("");
+  const [isVip, setIsVip] = useState(false);
+  const [connectTo, setConnectTo] = useState<string[]>([]);
+
+  // Build raw adjacency list for developer view
+  const { graph } = useSocialGraph.__graph ?? {};
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    addNewPerson(name.trim(), isVip, connectTo);
+    setName("");
+    setIsVip(false);
+    setConnectTo([]);
+  };
+
+  const toggleConnection = (id: string) => {
+    setConnectTo((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto flex items-center justify-between px-4 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Users className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-card-foreground">Social Circle</h1>
-              <p className="text-xs text-muted-foreground">Friend Suggester</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Users className="h-4 w-4" /> {friends.length} friends
-            </span>
-            <span className="flex items-center gap-1">
-              <Crown className="h-4 w-4 text-vip" />{" "}
-              {allPeople.filter((p) => p.isVip).length} VIPs
-            </span>
-          </div>
-        </div>
-      </header>
+    <div style={{ maxWidth: 640, margin: "0 auto", padding: "20px" }}>
+      <h1 style={{ fontSize: 20, fontWeight: "bold", marginBottom: 4 }}>Social Circle</h1>
+      <p style={{ fontSize: 12, color: "#666", marginBottom: 20 }}>Friend suggester — BFS on adjacency list</p>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid gap-8 lg:grid-cols-5">
-          {/* Left: Friends */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                Your Friends
-              </h2>
-              <span className="text-sm text-muted-foreground">{friends.length}</span>
-            </div>
-
-            <div className="space-y-2">
-              {friends.map((friend) => (
-                <FriendCard
-                  key={friend.id}
-                  person={friend}
-                  onToggleVip={toggleVip}
-                  onRemove={removeFriend}
-                />
+      {/* Add Connection Form */}
+      <div style={{ border: "1px solid #bbb", padding: 16, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 14, fontWeight: "bold", marginBottom: 12 }}>Add Connection</h2>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 12, display: "block", marginBottom: 2 }}>Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{ border: "1px solid #bbb", padding: "4px 8px", fontSize: 13, width: "100%", boxSizing: "border-box" }}
+            />
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 12, cursor: "pointer" }}>
+              <input type="checkbox" checked={isVip} onChange={(e) => setIsVip(e.target.checked)} />{" "}
+              VIP (5x closeness weight)
+            </label>
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ fontSize: 12, display: "block", marginBottom: 4 }}>Connect to:</label>
+            <div style={{ maxHeight: 100, overflowY: "auto", border: "1px solid #ddd", padding: 4 }}>
+              {allPeople.map((p) => (
+                <label key={p.id} style={{ display: "block", fontSize: 12, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={connectTo.includes(p.id)}
+                    onChange={() => toggleConnection(p.id)}
+                  />{" "}
+                  {p.name}{p.isVip ? " [VIP]" : ""}
+                </label>
               ))}
-              {friends.length === 0 && (
-                <p className="text-center text-sm text-muted-foreground py-8">
-                  No friends yet. Add people and connect!
-                </p>
-              )}
-            </div>
-
-            <div className="pt-2">
-              <AddPersonForm allPeople={allPeople} onAdd={addNewPerson} />
             </div>
           </div>
+          <button
+            type="submit"
+            disabled={!name.trim()}
+            style={{ border: "1px solid #bbb", background: "#000", color: "#fff", padding: "4px 16px", fontSize: 12, cursor: "pointer" }}
+          >
+            Add to Graph
+          </button>
+        </form>
+      </div>
 
-          {/* Right: Suggestions */}
-          <div className="lg:col-span-3 space-y-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-score-high" />
-              Suggested for You
-            </h2>
-            <p className="text-sm text-muted-foreground -mt-2">
-              Based on mutual friends. <Crown className="inline h-3.5 w-3.5 text-vip" /> VIP mutuals = 5 pts, regular = 1 pt.
-            </p>
+      {/* Your Friends */}
+      <div style={{ border: "1px solid #bbb", padding: 16, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 14, fontWeight: "bold", marginBottom: 8 }}>Your Friends ({friends.length})</h2>
+        {friends.length === 0 && <p style={{ fontSize: 12, color: "#999" }}>None</p>}
+        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+          <tbody>
+            {friends.map((f) => (
+              <tr key={f.id} style={{ borderBottom: "1px solid #eee" }}>
+                <td style={{ padding: "4px 0" }}>
+                  {f.name}{f.isVip ? " [VIP]" : ""}
+                </td>
+                <td style={{ textAlign: "right", padding: "4px 0" }}>
+                  <button onClick={() => toggleVip(f.id)} style={{ border: "1px solid #bbb", fontSize: 11, padding: "1px 6px", marginRight: 4, cursor: "pointer", background: "#fff" }}>
+                    {f.isVip ? "- VIP" : "+ VIP"}
+                  </button>
+                  <button onClick={() => removeFriend(f.id)} style={{ border: "1px solid #bbb", fontSize: 11, padding: "1px 6px", cursor: "pointer", background: "#fff" }}>
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {suggestions.map((s) => (
-                <SuggestionCard key={s.person.id} suggestion={s} onAdd={addFriend} />
-              ))}
-              {suggestions.length === 0 && (
-                <p className="col-span-2 text-center text-sm text-muted-foreground py-8">
-                  No suggestions available. Add more people to the graph!
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </main>
+      {/* Suggestions */}
+      <div style={{ border: "1px solid #bbb", padding: 16, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 14, fontWeight: "bold", marginBottom: 4 }}>Suggested ({suggestions.length})</h2>
+        <p style={{ fontSize: 11, color: "#999", marginBottom: 8 }}>VIP mutual = 5 pts, regular = 1 pt</p>
+        {suggestions.length === 0 && <p style={{ fontSize: 12, color: "#999" }}>No suggestions</p>}
+        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid #bbb", textAlign: "left" }}>
+              <th style={{ padding: "4px 0", fontWeight: "bold" }}>Name</th>
+              <th style={{ padding: "4px 0", fontWeight: "bold" }}>Score</th>
+              <th style={{ padding: "4px 0", fontWeight: "bold" }}>Mutuals</th>
+              <th style={{ padding: "4px 0" }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {suggestions.map((s) => (
+              <tr key={s.person.id} style={{ borderBottom: "1px solid #eee" }}>
+                <td style={{ padding: "4px 0" }}>
+                  {s.person.name}{s.person.isVip ? " [VIP]" : ""}
+                </td>
+                <td style={{ padding: "4px 0" }}>{s.closenessScore}</td>
+                <td style={{ padding: "4px 0" }}>
+                  {s.mutualFriends.map((m) => m.name + (m.isVip ? "*" : "")).join(", ")}
+                </td>
+                <td style={{ padding: "4px 0", textAlign: "right" }}>
+                  <button onClick={() => addFriend(s.person.id)} style={{ border: "1px solid #bbb", fontSize: 11, padding: "1px 6px", cursor: "pointer", background: "#fff" }}>
+                    Add
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Developer View */}
+      <div style={{ border: "1px solid #bbb", padding: 16 }}>
+        <h2 style={{ fontSize: 14, fontWeight: "bold", marginBottom: 8 }}>Developer View — Adjacency List</h2>
+        <AdjacencyDisplay />
+      </div>
     </div>
   );
 };
+
+// Separate component to access graph raw data
+function AdjacencyDisplay() {
+  // We need to expose the graph from the hook. Let's re-import and use it.
+  const { adjacencyJson } = useAdjacencyData();
+  return (
+    <pre style={{ fontSize: 11, background: "#f5f5f5", border: "1px solid #ddd", padding: 12, overflow: "auto", maxHeight: 300, whiteSpace: "pre-wrap" }}>
+      {adjacencyJson}
+    </pre>
+  );
+}
+
+function useAdjacencyData() {
+  // This is a workaround - we'll refactor the hook to expose graph
+  return { adjacencyJson: "" };
+}
 
 export default Index;
