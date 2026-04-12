@@ -2,15 +2,12 @@ import { useState } from "react";
 import { useSocialGraph } from "@/hooks/useSocialGraph";
 
 const Index = () => {
-  const { friends, suggestions, allPeople, addNewPerson, toggleVip, addFriend, removeFriend } =
+  const { friends, suggestions, allPeople, addNewPerson, toggleVip, addFriend, removeFriend, adjacencyJson } =
     useSocialGraph("you");
 
   const [name, setName] = useState("");
   const [isVip, setIsVip] = useState(false);
   const [connectTo, setConnectTo] = useState<string[]>([]);
-
-  // Build raw adjacency list for developer view
-  const { graph } = useSocialGraph.__graph ?? {};
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +25,7 @@ const Index = () => {
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", padding: "20px" }}>
+    <div style={{ maxWidth: 640, margin: "0 auto", padding: "20px", fontFamily: "Arial, Helvetica, sans-serif" }}>
       <h1 style={{ fontSize: 20, fontWeight: "bold", marginBottom: 4 }}>Social Circle</h1>
       <p style={{ fontSize: 12, color: "#666", marginBottom: 20 }}>Friend suggester — BFS on adjacency list</p>
 
@@ -42,7 +39,7 @@ const Index = () => {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              style={{ border: "1px solid #bbb", padding: "4px 8px", fontSize: 13, width: "100%", boxSizing: "border-box" }}
+              style={{ border: "1px solid #bbb", padding: "4px 8px", fontSize: 13, width: "100%", boxSizing: "border-box" as const }}
             />
           </div>
           <div style={{ marginBottom: 8 }}>
@@ -53,7 +50,7 @@ const Index = () => {
           </div>
           <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 12, display: "block", marginBottom: 4 }}>Connect to:</label>
-            <div style={{ maxHeight: 100, overflowY: "auto", border: "1px solid #ddd", padding: 4 }}>
+            <div style={{ maxHeight: 100, overflowY: "auto" as const, border: "1px solid #ddd", padding: 4 }}>
               {allPeople.map((p) => (
                 <label key={p.id} style={{ display: "block", fontSize: 12, cursor: "pointer" }}>
                   <input
@@ -80,14 +77,14 @@ const Index = () => {
       <div style={{ border: "1px solid #bbb", padding: 16, marginBottom: 20 }}>
         <h2 style={{ fontSize: 14, fontWeight: "bold", marginBottom: 8 }}>Your Friends ({friends.length})</h2>
         {friends.length === 0 && <p style={{ fontSize: 12, color: "#999" }}>None</p>}
-        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" as const }}>
           <tbody>
             {friends.map((f) => (
               <tr key={f.id} style={{ borderBottom: "1px solid #eee" }}>
                 <td style={{ padding: "4px 0" }}>
                   {f.name}{f.isVip ? " [VIP]" : ""}
                 </td>
-                <td style={{ textAlign: "right", padding: "4px 0" }}>
+                <td style={{ textAlign: "right" as const, padding: "4px 0" }}>
                   <button onClick={() => toggleVip(f.id)} style={{ border: "1px solid #bbb", fontSize: 11, padding: "1px 6px", marginRight: 4, cursor: "pointer", background: "#fff" }}>
                     {f.isVip ? "- VIP" : "+ VIP"}
                   </button>
@@ -106,9 +103,9 @@ const Index = () => {
         <h2 style={{ fontSize: 14, fontWeight: "bold", marginBottom: 4 }}>Suggested ({suggestions.length})</h2>
         <p style={{ fontSize: 11, color: "#999", marginBottom: 8 }}>VIP mutual = 5 pts, regular = 1 pt</p>
         {suggestions.length === 0 && <p style={{ fontSize: 12, color: "#999" }}>No suggestions</p>}
-        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" as const }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid #bbb", textAlign: "left" }}>
+            <tr style={{ borderBottom: "1px solid #bbb", textAlign: "left" as const }}>
               <th style={{ padding: "4px 0", fontWeight: "bold" }}>Name</th>
               <th style={{ padding: "4px 0", fontWeight: "bold" }}>Score</th>
               <th style={{ padding: "4px 0", fontWeight: "bold" }}>Mutuals</th>
@@ -125,7 +122,7 @@ const Index = () => {
                 <td style={{ padding: "4px 0" }}>
                   {s.mutualFriends.map((m) => m.name + (m.isVip ? "*" : "")).join(", ")}
                 </td>
-                <td style={{ padding: "4px 0", textAlign: "right" }}>
+                <td style={{ padding: "4px 0", textAlign: "right" as const }}>
                   <button onClick={() => addFriend(s.person.id)} style={{ border: "1px solid #bbb", fontSize: 11, padding: "1px 6px", cursor: "pointer", background: "#fff" }}>
                     Add
                   </button>
@@ -139,26 +136,12 @@ const Index = () => {
       {/* Developer View */}
       <div style={{ border: "1px solid #bbb", padding: 16 }}>
         <h2 style={{ fontSize: 14, fontWeight: "bold", marginBottom: 8 }}>Developer View — Adjacency List</h2>
-        <AdjacencyDisplay />
+        <pre style={{ fontSize: 11, background: "#f5f5f5", border: "1px solid #ddd", padding: 12, overflow: "auto", maxHeight: 300, whiteSpace: "pre-wrap" as const }}>
+          {adjacencyJson}
+        </pre>
       </div>
     </div>
   );
 };
-
-// Separate component to access graph raw data
-function AdjacencyDisplay() {
-  // We need to expose the graph from the hook. Let's re-import and use it.
-  const { adjacencyJson } = useAdjacencyData();
-  return (
-    <pre style={{ fontSize: 11, background: "#f5f5f5", border: "1px solid #ddd", padding: 12, overflow: "auto", maxHeight: 300, whiteSpace: "pre-wrap" }}>
-      {adjacencyJson}
-    </pre>
-  );
-}
-
-function useAdjacencyData() {
-  // This is a workaround - we'll refactor the hook to expose graph
-  return { adjacencyJson: "" };
-}
 
 export default Index;
