@@ -57,19 +57,5 @@ export function useSocialGraph(userId = "you") {
     [graph, userId]
   );
 
-  // Build adjacency JSON for developer view
-  const adjacencyJson = useMemo(() => {
-    const obj: Record<string, string[]> = {};
-    for (const [id, neighbors] of graph.adjacency) {
-      const person = graph.people.get(id);
-      const label = person ? `${person.name}${person.isVip ? " [VIP]" : ""}` : id;
-      obj[label] = Array.from(neighbors).map((nId) => {
-        const np = graph.people.get(nId);
-        return np ? np.name : nId;
-      });
-    }
-    return JSON.stringify(obj, null, 2);
-  }, [graph]);
-
-  return { friends, suggestions, allPeople, addNewPerson, toggleVip, addFriend, removeFriend, adjacencyJson };
+  return { friends, suggestions, allPeople, addNewPerson, toggleVip, addFriend, removeFriend };
 }
