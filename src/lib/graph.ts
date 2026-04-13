@@ -1,8 +1,17 @@
+export interface PersonTraits {
+  humor: number;       // 0-10
+  empathy: number;     // 0-10
+  energy: number;      // 0-10
+  reliability: number; // 0-10
+  openness: number;    // 0-10
+}
+
 export interface Person {
   id: string;
   name: string;
   isVip: boolean;
   avatar?: string;
+  traits: PersonTraits;
 }
 
 export interface FriendSuggestion {
@@ -195,24 +204,24 @@ export function createSeededGraph(): SocialGraph {
   const graph = createGraph();
 
   const people: Person[] = [
-    { id: "you", name: "You", isVip: false },
-    { id: "alice", name: "Alice Chen", isVip: true },
-    { id: "bob", name: "Bob Martinez", isVip: false },
-    { id: "carol", name: "Carol Kim", isVip: false },
-    { id: "dave", name: "Dave Wilson", isVip: true },
-    { id: "eve", name: "Eve Johnson", isVip: false },
-    { id: "frank", name: "Frank Lee", isVip: false },
-    { id: "grace", name: "Grace Patel", isVip: false },
-    { id: "hank", name: "Hank Brown", isVip: true },
-    { id: "ivy", name: "Ivy Zhang", isVip: false },
-    { id: "jack", name: "Jack Rivera", isVip: false },
-    { id: "kate", name: "Kate Murphy", isVip: true },
-    { id: "leo", name: "Leo Thompson", isVip: false },
-    { id: "mia", name: "Mia Garcia", isVip: false },
-    { id: "noah", name: "Noah Davis", isVip: false },
-    { id: "olivia", name: "Olivia Scott", isVip: true },
-    { id: "pete", name: "Pete Adams", isVip: false },
-    { id: "quinn", name: "Quinn Taylor", isVip: false },
+    { id: "you", name: "You", isVip: false, traits: { humor: 6, empathy: 5, energy: 6, reliability: 7, openness: 6 } },
+    { id: "alice", name: "Alice Chen", isVip: true, traits: { humor: 8, empathy: 9, energy: 7, reliability: 9, openness: 8 } },
+    { id: "bob", name: "Bob Martinez", isVip: false, traits: { humor: 9, empathy: 5, energy: 9, reliability: 6, openness: 7 } },
+    { id: "carol", name: "Carol Kim", isVip: false, traits: { humor: 6, empathy: 8, energy: 5, reliability: 8, openness: 9 } },
+    { id: "dave", name: "Dave Wilson", isVip: true, traits: { humor: 7, empathy: 6, energy: 8, reliability: 7, openness: 5 } },
+    { id: "eve", name: "Eve Johnson", isVip: false, traits: { humor: 5, empathy: 9, energy: 4, reliability: 9, openness: 7 } },
+    { id: "frank", name: "Frank Lee", isVip: false, traits: { humor: 8, empathy: 4, energy: 8, reliability: 5, openness: 6 } },
+    { id: "grace", name: "Grace Patel", isVip: false, traits: { humor: 6, empathy: 7, energy: 6, reliability: 8, openness: 10 } },
+    { id: "hank", name: "Hank Brown", isVip: true, traits: { humor: 4, empathy: 6, energy: 5, reliability: 10, openness: 4 } },
+    { id: "ivy", name: "Ivy Zhang", isVip: false, traits: { humor: 7, empathy: 8, energy: 7, reliability: 7, openness: 8 } },
+    { id: "jack", name: "Jack Rivera", isVip: false, traits: { humor: 9, empathy: 6, energy: 10, reliability: 5, openness: 7 } },
+    { id: "kate", name: "Kate Murphy", isVip: true, traits: { humor: 7, empathy: 8, energy: 6, reliability: 9, openness: 6 } },
+    { id: "leo", name: "Leo Thompson", isVip: false, traits: { humor: 6, empathy: 5, energy: 7, reliability: 6, openness: 8 } },
+    { id: "mia", name: "Mia Garcia", isVip: false, traits: { humor: 8, empathy: 9, energy: 6, reliability: 7, openness: 9 } },
+    { id: "noah", name: "Noah Davis", isVip: false, traits: { humor: 5, empathy: 7, energy: 5, reliability: 8, openness: 5 } },
+    { id: "olivia", name: "Olivia Scott", isVip: true, traits: { humor: 7, empathy: 7, energy: 8, reliability: 8, openness: 7 } },
+    { id: "pete", name: "Pete Adams", isVip: false, traits: { humor: 9, empathy: 4, energy: 9, reliability: 4, openness: 6 } },
+    { id: "quinn", name: "Quinn Taylor", isVip: false, traits: { humor: 6, empathy: 8, energy: 5, reliability: 7, openness: 9 } },
   ];
 
   people.forEach((p) => addPerson(graph, p));
