@@ -1,8 +1,17 @@
+export interface PersonTraits {
+  humor: number;       // 0-10
+  empathy: number;     // 0-10
+  energy: number;      // 0-10
+  reliability: number; // 0-10
+  openness: number;    // 0-10
+}
+
 export interface Person {
   id: string;
   name: string;
   isVip: boolean;
   avatar?: string;
+  traits: PersonTraits;
 }
 
 export interface FriendSuggestion {
@@ -190,29 +199,158 @@ export function getSocialDNA(graph: SocialGraph, userId: string): {
   return { vipRatio, avgFriendConnections, networkReach, clusterCoeff };
 }
 
+export interface LikeabilityResult {
+  score: number; // 0-100
+  breakdown: { trait: string; label: string; yourAvg: number; friendAvg: number; impact: number }[];
+  tips: { priority: "high" | "medium" | "low"; trait: string; message: string }[];
+  archetype: string;
+}
+
+const TRAIT_LABELS: Record<keyof PersonTraits, string> = {
+  humor: "Humor",
+  empathy: "Empathy",
+  energy: "Energy",
+  reliability: "Reliability",
+  openness: "Openness",
+};
+
+/** Estimate likeability based on your traits influenced by your friends' traits */
+export function getLikeability(graph: SocialGraph, userId: string): LikeabilityResult {
+  const user = graph.people.get(userId);
+  if (!user) return { score: 50, breakdown: [], tips: [], archetype: "Unknown" };
+
+  const friends = getFriends(graph, userId);
+  if (friends.length === 0) {
+    return { score: 30, breakdown: [], tips: [{ priority: "high", trait: "connections", message: "Start by making friends! Likeability grows through connections." }], archetype: "The Newcomer" };
+  }
+
+  const traitKeys: (keyof PersonTraits)[] = ["humor", "empathy", "energy", "reliability", "openness"];
+
+  // Your effective traits = your base + 30% influence from friends' average
+  const friendAvgs: Record<string, number> = {};
+  const effectiveTraits: Record<string, number> = {};
+  const breakdown: LikeabilityResult["breakdown"] = [];
+
+  for (const key of traitKeys) {
+    const friendAvg = friends.reduce((s, f) => s + f.traits[key], 0) / friends.length;
+    friendAvgs[key] = friendAvg;
+    const effective = user.traits[key] * 0.7 + friendAvg * 0.3;
+    effectiveTraits[key] = effective;
+
+    const impact = Math.round(effective * 10) / 10;
+    breakdown.push({
+      trait: key,
+      label: TRAIT_LABELS[key],
+      yourAvg: user.traits[key],
+      friendAvg: Math.round(friendAvg * 10) / 10,
+      impact,
+    });
+  }
+
+  // Score: weighted sum (empathy and reliability matter most)
+  const weights = { humor: 1, empathy: 1.4, energy: 0.8, reliability: 1.3, openness: 1 };
+  const maxPossible = traitKeys.reduce((s, k) => s + 10 * weights[k], 0);
+  const rawScore = traitKeys.reduce((s, k) => s + effectiveTraits[k] * weights[k], 0);
+  const score = Math.round((rawScore / maxPossible) * 100);
+
+  // Generate coaching tips
+  const tips: LikeabilityResult["tips"] = [];
+
+  // Find weakest traits
+  const sorted = [...breakdown].sort((a, b) => a.impact - b.impact);
+
+  for (const item of sorted.slice(0, 2)) {
+    if (item.impact < 6) {
+      const friendDiff = item.friendAvg - item.yourAvg;
+      if (friendDiff < -1) {
+        tips.push({
+          priority: "high",
+          trait: item.label,
+          message: `Your ${item.label.toLowerCase()} is low (${item.yourAvg}/10) and your friends don't compensate (avg ${item.friendAvg}). Befriend people high in ${item.label.toLowerCase()} to boost your social perception.`,
+        });
+      } else {
+        tips.push({
+          priority: "medium",
+          trait: item.label,
+          message: `Your ${item.label.toLowerCase()} could improve (${item.yourAvg}/10). Your friends help a bit (avg ${item.friendAvg}), but working on this yourself will have the biggest impact.`,
+        });
+      }
+    }
+  }
+
+  // Check friend diversity
+  const traitVariance = traitKeys.reduce((s, k) => {
+    const vals = friends.map((f) => f.traits[k]);
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    return s + vals.reduce((a, v) => a + (v - avg) ** 2, 0) / vals.length;
+  }, 0) / traitKeys.length;
+
+  if (traitVariance < 2) {
+    tips.push({
+      priority: "medium",
+      trait: "Diversity",
+      message: "Your friends are very similar to each other. Diversifying your circle with different personality types would make you more adaptable and well-rounded.",
+    });
+  }
+
+  // VIP friend suggestion
+  const vipFriends = friends.filter((f) => f.isVip);
+  if (vipFriends.length === 0) {
+    tips.push({
+      priority: "low",
+      trait: "Status",
+      message: "You have no VIP connections. VIPs tend to have stronger trait profiles — befriending one could elevate your network quality.",
+    });
+  }
+
+  // Check balance
+  const highTraits = breakdown.filter((b) => b.impact >= 7);
+  const lowTraits = breakdown.filter((b) => b.impact < 5);
+  if (highTraits.length > 0 && lowTraits.length > 0) {
+    tips.push({
+      priority: "low",
+      trait: "Balance",
+      message: `You excel in ${highTraits.map((t) => t.label.toLowerCase()).join(", ")} but lag in ${lowTraits.map((t) => t.label.toLowerCase()).join(", ")}. Balance creates lasting impressions.`,
+    });
+  }
+
+  // Archetype
+  const top = [...breakdown].sort((a, b) => b.impact - a.impact)[0];
+  const archetypes: Record<string, string> = {
+    humor: "The Entertainer 🎭",
+    empathy: "The Empath 💗",
+    energy: "The Energizer ⚡",
+    reliability: "The Rock 🪨",
+    openness: "The Explorer 🌍",
+  };
+  const archetype = archetypes[top.trait] || "The Balanced One ⚖️";
+
+  return { score, breakdown, tips, archetype };
+}
+
 // Seed data - expanded
 export function createSeededGraph(): SocialGraph {
   const graph = createGraph();
 
   const people: Person[] = [
-    { id: "you", name: "You", isVip: false },
-    { id: "alice", name: "Alice Chen", isVip: true },
-    { id: "bob", name: "Bob Martinez", isVip: false },
-    { id: "carol", name: "Carol Kim", isVip: false },
-    { id: "dave", name: "Dave Wilson", isVip: true },
-    { id: "eve", name: "Eve Johnson", isVip: false },
-    { id: "frank", name: "Frank Lee", isVip: false },
-    { id: "grace", name: "Grace Patel", isVip: false },
-    { id: "hank", name: "Hank Brown", isVip: true },
-    { id: "ivy", name: "Ivy Zhang", isVip: false },
-    { id: "jack", name: "Jack Rivera", isVip: false },
-    { id: "kate", name: "Kate Murphy", isVip: true },
-    { id: "leo", name: "Leo Thompson", isVip: false },
-    { id: "mia", name: "Mia Garcia", isVip: false },
-    { id: "noah", name: "Noah Davis", isVip: false },
-    { id: "olivia", name: "Olivia Scott", isVip: true },
-    { id: "pete", name: "Pete Adams", isVip: false },
-    { id: "quinn", name: "Quinn Taylor", isVip: false },
+    { id: "you", name: "You", isVip: false, traits: { humor: 6, empathy: 5, energy: 6, reliability: 7, openness: 6 } },
+    { id: "alice", name: "Alice Chen", isVip: true, traits: { humor: 8, empathy: 9, energy: 7, reliability: 9, openness: 8 } },
+    { id: "bob", name: "Bob Martinez", isVip: false, traits: { humor: 9, empathy: 5, energy: 9, reliability: 6, openness: 7 } },
+    { id: "carol", name: "Carol Kim", isVip: false, traits: { humor: 6, empathy: 8, energy: 5, reliability: 8, openness: 9 } },
+    { id: "dave", name: "Dave Wilson", isVip: true, traits: { humor: 7, empathy: 6, energy: 8, reliability: 7, openness: 5 } },
+    { id: "eve", name: "Eve Johnson", isVip: false, traits: { humor: 5, empathy: 9, energy: 4, reliability: 9, openness: 7 } },
+    { id: "frank", name: "Frank Lee", isVip: false, traits: { humor: 8, empathy: 4, energy: 8, reliability: 5, openness: 6 } },
+    { id: "grace", name: "Grace Patel", isVip: false, traits: { humor: 6, empathy: 7, energy: 6, reliability: 8, openness: 10 } },
+    { id: "hank", name: "Hank Brown", isVip: true, traits: { humor: 4, empathy: 6, energy: 5, reliability: 10, openness: 4 } },
+    { id: "ivy", name: "Ivy Zhang", isVip: false, traits: { humor: 7, empathy: 8, energy: 7, reliability: 7, openness: 8 } },
+    { id: "jack", name: "Jack Rivera", isVip: false, traits: { humor: 9, empathy: 6, energy: 10, reliability: 5, openness: 7 } },
+    { id: "kate", name: "Kate Murphy", isVip: true, traits: { humor: 7, empathy: 8, energy: 6, reliability: 9, openness: 6 } },
+    { id: "leo", name: "Leo Thompson", isVip: false, traits: { humor: 6, empathy: 5, energy: 7, reliability: 6, openness: 8 } },
+    { id: "mia", name: "Mia Garcia", isVip: false, traits: { humor: 8, empathy: 9, energy: 6, reliability: 7, openness: 9 } },
+    { id: "noah", name: "Noah Davis", isVip: false, traits: { humor: 5, empathy: 7, energy: 5, reliability: 8, openness: 5 } },
+    { id: "olivia", name: "Olivia Scott", isVip: true, traits: { humor: 7, empathy: 7, energy: 8, reliability: 8, openness: 7 } },
+    { id: "pete", name: "Pete Adams", isVip: false, traits: { humor: 9, empathy: 4, energy: 9, reliability: 4, openness: 6 } },
+    { id: "quinn", name: "Quinn Taylor", isVip: false, traits: { humor: 6, empathy: 8, energy: 5, reliability: 7, openness: 9 } },
   ];
 
   people.forEach((p) => addPerson(graph, p));
