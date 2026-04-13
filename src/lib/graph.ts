@@ -2,6 +2,7 @@ export interface Person {
   id: string;
   name: string;
   isVip: boolean;
+  avatar?: string;
 }
 
 export interface FriendSuggestion {
@@ -44,17 +45,12 @@ export function getFriends(graph: SocialGraph, personId: string): Person[] {
     .filter(Boolean) as Person[];
 }
 
-/**
- * BFS to find 2nd-degree connections.
- * Closeness score: each mutual friend = 1 point, VIP mutual = 5 points.
- */
 export function getSuggestions(graph: SocialGraph, userId: string): FriendSuggestion[] {
   const directFriends = graph.adjacency.get(userId);
   if (!directFriends) return [];
 
-  const suggestions = new Map<string, Person[]>(); // candidateId -> mutualFriends[]
+  const suggestions = new Map<string, Person[]>();
 
-  // BFS depth-2: iterate each direct friend, then their friends
   for (const friendId of directFriends) {
     const friendsOfFriend = graph.adjacency.get(friendId);
     if (!friendsOfFriend) continue;
@@ -91,7 +87,110 @@ export function getSuggestions(graph: SocialGraph, userId: string): FriendSugges
   return results.sort((a, b) => b.closenessScore - a.closenessScore);
 }
 
-// Seed data
+/** Find shortest path between two people using BFS */
+export function findShortestPath(graph: SocialGraph, fromId: string, toId: string): string[] | null {
+  if (fromId === toId) return [fromId];
+  const visited = new Set<string>();
+  const queue: string[][] = [[fromId]];
+  visited.add(fromId);
+
+  while (queue.length > 0) {
+    const path = queue.shift()!;
+    const current = path[path.length - 1];
+    const neighbors = graph.adjacency.get(current);
+    if (!neighbors) continue;
+
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor)) continue;
+      const newPath = [...path, neighbor];
+      if (neighbor === toId) return newPath;
+      visited.add(neighbor);
+      queue.push(newPath);
+    }
+  }
+  return null;
+}
+
+/** Calculate influence score: weighted degree centrality */
+export function getInfluenceScore(graph: SocialGraph, personId: string): number {
+  const friends = graph.adjacency.get(personId);
+  if (!friends) return 0;
+  let score = 0;
+  for (const fId of friends) {
+    const friend = graph.people.get(fId);
+    const friendConnections = graph.adjacency.get(fId)?.size || 0;
+    score += (friend?.isVip ? 3 : 1) * (1 + friendConnections * 0.2);
+  }
+  return Math.round(score * 10) / 10;
+}
+
+/** Detect cliques (groups where everyone knows everyone) - finds triangles and larger */
+export function detectCliques(graph: SocialGraph): string[][] {
+  const cliques: string[][] = [];
+  const people = Array.from(graph.people.keys());
+
+  // Find all triangles
+  for (let i = 0; i < people.length; i++) {
+    for (let j = i + 1; j < people.length; j++) {
+      if (!graph.adjacency.get(people[i])?.has(people[j])) continue;
+      for (let k = j + 1; k < people.length; k++) {
+        if (
+          graph.adjacency.get(people[i])?.has(people[k]) &&
+          graph.adjacency.get(people[j])?.has(people[k])
+        ) {
+          cliques.push([people[i], people[j], people[k]]);
+        }
+      }
+    }
+  }
+  return cliques;
+}
+
+/** Social DNA: distribution of connection types */
+export function getSocialDNA(graph: SocialGraph, userId: string): {
+  vipRatio: number;
+  avgFriendConnections: number;
+  networkReach: number;
+  clusterCoeff: number;
+} {
+  const friends = graph.adjacency.get(userId);
+  if (!friends || friends.size === 0) {
+    return { vipRatio: 0, avgFriendConnections: 0, networkReach: 0, clusterCoeff: 0 };
+  }
+
+  const friendArr = Array.from(friends);
+  const vipCount = friendArr.filter((id) => graph.people.get(id)?.isVip).length;
+  const vipRatio = vipCount / friendArr.length;
+
+  const avgFriendConnections =
+    friendArr.reduce((sum, id) => sum + (graph.adjacency.get(id)?.size || 0), 0) / friendArr.length;
+
+  // Network reach: unique people within 2 hops
+  const reached = new Set<string>();
+  for (const fId of friends) {
+    reached.add(fId);
+    const fof = graph.adjacency.get(fId);
+    if (fof) fof.forEach((id) => { if (id !== userId) reached.add(id); });
+  }
+  const networkReach = reached.size;
+
+  // Clustering coefficient
+  let triangles = 0;
+  let possibleTriangles = 0;
+  for (let i = 0; i < friendArr.length; i++) {
+    for (let j = i + 1; j < friendArr.length; j++) {
+      possibleTriangles++;
+      if (graph.adjacency.get(friendArr[i])?.has(friendArr[j])) {
+        triangles++;
+      }
+    }
+  }
+  const clusterCoeff = possibleTriangles > 0 ? triangles / possibleTriangles : 0;
+
+  return { vipRatio, avgFriendConnections, networkReach, clusterCoeff };
+}
+
+// Seed data - expanded
 export function createSeededGraph(): SocialGraph {
   const graph = createGraph();
 
@@ -106,6 +205,14 @@ export function createSeededGraph(): SocialGraph {
     { id: "grace", name: "Grace Patel", isVip: false },
     { id: "hank", name: "Hank Brown", isVip: true },
     { id: "ivy", name: "Ivy Zhang", isVip: false },
+    { id: "jack", name: "Jack Rivera", isVip: false },
+    { id: "kate", name: "Kate Murphy", isVip: true },
+    { id: "leo", name: "Leo Thompson", isVip: false },
+    { id: "mia", name: "Mia Garcia", isVip: false },
+    { id: "noah", name: "Noah Davis", isVip: false },
+    { id: "olivia", name: "Olivia Scott", isVip: true },
+    { id: "pete", name: "Pete Adams", isVip: false },
+    { id: "quinn", name: "Quinn Taylor", isVip: false },
   ];
 
   people.forEach((p) => addPerson(graph, p));
@@ -114,17 +221,40 @@ export function createSeededGraph(): SocialGraph {
   addFriendship(graph, "you", "alice");
   addFriendship(graph, "you", "bob");
   addFriendship(graph, "you", "carol");
+  addFriendship(graph, "you", "jack");
 
   // 2nd-degree connections
   addFriendship(graph, "alice", "dave");
   addFriendship(graph, "alice", "eve");
+  addFriendship(graph, "alice", "kate");
   addFriendship(graph, "bob", "dave");
   addFriendship(graph, "bob", "frank");
+  addFriendship(graph, "bob", "leo");
   addFriendship(graph, "carol", "eve");
   addFriendship(graph, "carol", "grace");
+  addFriendship(graph, "carol", "mia");
+  addFriendship(graph, "jack", "kate");
+  addFriendship(graph, "jack", "noah");
+
+  // 3rd-degree and deeper connections
   addFriendship(graph, "dave", "hank");
+  addFriendship(graph, "dave", "olivia");
   addFriendship(graph, "eve", "ivy");
+  addFriendship(graph, "eve", "mia");
   addFriendship(graph, "frank", "grace");
+  addFriendship(graph, "frank", "pete");
+  addFriendship(graph, "grace", "quinn");
+  addFriendship(graph, "hank", "olivia");
+  addFriendship(graph, "kate", "olivia");
+  addFriendship(graph, "leo", "noah");
+  addFriendship(graph, "leo", "pete");
+  addFriendship(graph, "mia", "quinn");
+  addFriendship(graph, "noah", "quinn");
+
+  // Some cross-connections for interesting cliques
+  addFriendship(graph, "alice", "bob"); // triangle with you
+  addFriendship(graph, "dave", "kate");
+  addFriendship(graph, "frank", "leo");
 
   return graph;
 }
