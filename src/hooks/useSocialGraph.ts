@@ -12,8 +12,6 @@ import {
 
 export function useSocialGraph(userId = "you") {
   const [graph, setGraph] = useState<SocialGraph>(() => createSeededGraph());
-  const [, setTick] = useState(0);
-  const rerender = () => setTick((t) => t + 1);
 
   const friends = useMemo(() => getFriends(graph, userId), [graph, userId]);
   const suggestions = useMemo(() => getSuggestions(graph, userId), [graph, userId]);
@@ -57,5 +55,5 @@ export function useSocialGraph(userId = "you") {
     [graph, userId]
   );
 
-  return { friends, suggestions, allPeople, addNewPerson, toggleVip, addFriend, removeFriend };
+  return { graph, friends, suggestions, allPeople, addNewPerson, toggleVip, addFriend, removeFriend };
 }
