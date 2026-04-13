@@ -199,6 +199,135 @@ export function getSocialDNA(graph: SocialGraph, userId: string): {
   return { vipRatio, avgFriendConnections, networkReach, clusterCoeff };
 }
 
+export interface LikeabilityResult {
+  score: number; // 0-100
+  breakdown: { trait: string; label: string; yourAvg: number; friendAvg: number; impact: number }[];
+  tips: { priority: "high" | "medium" | "low"; trait: string; message: string }[];
+  archetype: string;
+}
+
+const TRAIT_LABELS: Record<keyof PersonTraits, string> = {
+  humor: "Humor",
+  empathy: "Empathy",
+  energy: "Energy",
+  reliability: "Reliability",
+  openness: "Openness",
+};
+
+/** Estimate likeability based on your traits influenced by your friends' traits */
+export function getLikeability(graph: SocialGraph, userId: string): LikeabilityResult {
+  const user = graph.people.get(userId);
+  if (!user) return { score: 50, breakdown: [], tips: [], archetype: "Unknown" };
+
+  const friends = getFriends(graph, userId);
+  if (friends.length === 0) {
+    return { score: 30, breakdown: [], tips: [{ priority: "high", trait: "connections", message: "Start by making friends! Likeability grows through connections." }], archetype: "The Newcomer" };
+  }
+
+  const traitKeys: (keyof PersonTraits)[] = ["humor", "empathy", "energy", "reliability", "openness"];
+
+  // Your effective traits = your base + 30% influence from friends' average
+  const friendAvgs: Record<string, number> = {};
+  const effectiveTraits: Record<string, number> = {};
+  const breakdown: LikeabilityResult["breakdown"] = [];
+
+  for (const key of traitKeys) {
+    const friendAvg = friends.reduce((s, f) => s + f.traits[key], 0) / friends.length;
+    friendAvgs[key] = friendAvg;
+    const effective = user.traits[key] * 0.7 + friendAvg * 0.3;
+    effectiveTraits[key] = effective;
+
+    const impact = Math.round(effective * 10) / 10;
+    breakdown.push({
+      trait: key,
+      label: TRAIT_LABELS[key],
+      yourAvg: user.traits[key],
+      friendAvg: Math.round(friendAvg * 10) / 10,
+      impact,
+    });
+  }
+
+  // Score: weighted sum (empathy and reliability matter most)
+  const weights = { humor: 1, empathy: 1.4, energy: 0.8, reliability: 1.3, openness: 1 };
+  const maxPossible = traitKeys.reduce((s, k) => s + 10 * weights[k], 0);
+  const rawScore = traitKeys.reduce((s, k) => s + effectiveTraits[k] * weights[k], 0);
+  const score = Math.round((rawScore / maxPossible) * 100);
+
+  // Generate coaching tips
+  const tips: LikeabilityResult["tips"] = [];
+
+  // Find weakest traits
+  const sorted = [...breakdown].sort((a, b) => a.impact - b.impact);
+
+  for (const item of sorted.slice(0, 2)) {
+    if (item.impact < 6) {
+      const friendDiff = item.friendAvg - item.yourAvg;
+      if (friendDiff < -1) {
+        tips.push({
+          priority: "high",
+          trait: item.label,
+          message: `Your ${item.label.toLowerCase()} is low (${item.yourAvg}/10) and your friends don't compensate (avg ${item.friendAvg}). Befriend people high in ${item.label.toLowerCase()} to boost your social perception.`,
+        });
+      } else {
+        tips.push({
+          priority: "medium",
+          trait: item.label,
+          message: `Your ${item.label.toLowerCase()} could improve (${item.yourAvg}/10). Your friends help a bit (avg ${item.friendAvg}), but working on this yourself will have the biggest impact.`,
+        });
+      }
+    }
+  }
+
+  // Check friend diversity
+  const traitVariance = traitKeys.reduce((s, k) => {
+    const vals = friends.map((f) => f.traits[k]);
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    return s + vals.reduce((a, v) => a + (v - avg) ** 2, 0) / vals.length;
+  }, 0) / traitKeys.length;
+
+  if (traitVariance < 2) {
+    tips.push({
+      priority: "medium",
+      trait: "Diversity",
+      message: "Your friends are very similar to each other. Diversifying your circle with different personality types would make you more adaptable and well-rounded.",
+    });
+  }
+
+  // VIP friend suggestion
+  const vipFriends = friends.filter((f) => f.isVip);
+  if (vipFriends.length === 0) {
+    tips.push({
+      priority: "low",
+      trait: "Status",
+      message: "You have no VIP connections. VIPs tend to have stronger trait profiles — befriending one could elevate your network quality.",
+    });
+  }
+
+  // Check balance
+  const highTraits = breakdown.filter((b) => b.impact >= 7);
+  const lowTraits = breakdown.filter((b) => b.impact < 5);
+  if (highTraits.length > 0 && lowTraits.length > 0) {
+    tips.push({
+      priority: "low",
+      trait: "Balance",
+      message: `You excel in ${highTraits.map((t) => t.label.toLowerCase()).join(", ")} but lag in ${lowTraits.map((t) => t.label.toLowerCase()).join(", ")}. Balance creates lasting impressions.`,
+    });
+  }
+
+  // Archetype
+  const top = [...breakdown].sort((a, b) => b.impact - a.impact)[0];
+  const archetypes: Record<string, string> = {
+    humor: "The Entertainer 🎭",
+    empathy: "The Empath 💗",
+    energy: "The Energizer ⚡",
+    reliability: "The Rock 🪨",
+    openness: "The Explorer 🌍",
+  };
+  const archetype = archetypes[top.trait] || "The Balanced One ⚖️";
+
+  return { score, breakdown, tips, archetype };
+}
+
 // Seed data - expanded
 export function createSeededGraph(): SocialGraph {
   const graph = createGraph();
