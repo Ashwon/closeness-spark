@@ -20,10 +20,7 @@ export function useSocialGraph(userId = "you") {
   const addNewPerson = useCallback(
     (name: string, isVip: boolean, connectTo: string[]) => {
       const id = name.toLowerCase().replace(/\s+/g, "-") + "-" + Date.now();
-      const person: Person = {
-        id, name, isVip,
-        traits: { humor: 5, empathy: 5, energy: 5, reliability: 5, openness: 5 },
-      };
+      const person: Person = { id, name, isVip };
       addPerson(graph, person);
       connectTo.forEach((friendId) => addFriendship(graph, id, friendId));
       setGraph({ ...graph });

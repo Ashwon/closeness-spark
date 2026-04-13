@@ -8,8 +8,7 @@ import SocialDNA from "@/components/SocialDNA";
 import PathFinder from "@/components/PathFinder";
 import CliqueDetector from "@/components/CliqueDetector";
 import InfluenceLeaderboard from "@/components/InfluenceLeaderboard";
-import LikeabilityCoach from "@/components/LikeabilityCoach";
-import { Users, Sparkles, Crown, LayoutGrid, Network, Heart } from "lucide-react";
+import { Users, Sparkles, Crown, LayoutGrid, Network } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Index = () => {
@@ -133,11 +132,8 @@ const Index = () => {
           {/* Insights Tab */}
           <TabsContent value="insights">
             <div className="grid gap-6 lg:grid-cols-2">
-              <div className="space-y-6">
-                <SocialDNA graph={graph} userId="you" />
-                <InfluenceLeaderboard graph={graph} />
-              </div>
-              <LikeabilityCoach graph={graph} userId="you" />
+              <SocialDNA graph={graph} userId="you" />
+              <InfluenceLeaderboard graph={graph} />
               <div className="lg:col-span-2">
                 <CliqueDetector graph={graph} />
               </div>
